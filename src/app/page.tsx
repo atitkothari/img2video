@@ -1,115 +1,119 @@
 'use client';
 
 import { useState } from 'react';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
-import Scene, { SceneData } from '@/components/Scene';
-import { dummyScenes, DummySceneData } from '@/data/dummyScenes';
+import Scene from '@/components/Scene';
+import type { SceneData } from '@/components/Scene';
+import { dummyScenes } from '@/data/dummyScenes';
 
 export default function Home() {
-  const [scenes, setScenes] = useState<SceneData[]>(dummyScenes);
-  const [dummyData, setDummyData] = useState<DummySceneData[]>(dummyScenes);
+    const [scenes, setScenes] = useState<SceneData[]>(dummyScenes);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [combinedVideoUrl, setCombinedVideoUrl] = useState<string | null>(null);
 
-  const handleSceneChange = (id: number, data: SceneData) => {
-    setScenes(prev => {
-      const newScenes = [...prev];
-      newScenes[id] = { ...newScenes[id], ...data };
-      return newScenes;
-    });
-  };
+    const handleAddScene = () => {
+        setScenes([...scenes, {
+            sceneDirection: '',
+            dialogues: [],
+            audioDirection: ''
+        }]);
+    };
 
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
+    const handleUpdateScene = (index: number, updatedScene: SceneData) => {
+        const newScenes = [...scenes];
+        newScenes[index] = updatedScene;
+        setScenes(newScenes);
+    };
 
-    const sourceIndex = result.source.index;
-    const destinationIndex = result.destination.index;
+    const handleDeleteScene = (index: number) => {
+        const newScenes = scenes.filter((_, i) => i !== index);
+        setScenes(newScenes);
+    };
 
-    // Reorder scenes (with edited content)
-    const newScenes = Array.from(scenes);
-    const [movedScene] = newScenes.splice(sourceIndex, 1);
-    newScenes.splice(destinationIndex, 0, movedScene);
-    setScenes(newScenes);
+    const handleMoveScene = (index: number, direction: 'up' | 'down') => {
+        const newScenes = [...scenes];
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        [newScenes[index], newScenes[newIndex]] = [newScenes[newIndex], newScenes[index]];
+        setScenes(newScenes);
+    };
 
-    // Reorder dummy data (for thumbnails only)
-    const newDummyData = Array.from(dummyData);
-    const [movedDummy] = newDummyData.splice(sourceIndex, 1);
-    newDummyData.splice(destinationIndex, 0, movedDummy);
-    setDummyData(newDummyData);
-  };
+    const handleGenerateAll = async () => {
+        setIsGenerating(true);
+        try {
+            const response = await fetch('/api/generateClip', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(scenes),
+            });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const response = await fetch('/api/generateClip', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(scenes),
-      });
-      
-      const data = await response.json();
-      console.log('API Response:', data);
-      
-      if (!data.success) {
-        throw new Error(data.message);
-      }
-      
-      alert('Clip generation request sent successfully!');
-    } catch (error) {
-      console.error('Error generating clip:', error);
-      alert('Failed to generate clip. Please try again.');
-    }
-  };
+            if (!response.ok) {
+                throw new Error('Failed to generate video');
+            }
 
-  return (
-    <main className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-[1200px] mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Scene Editor</h1>
-        <form onSubmit={handleSubmit}>
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="scenes" direction="vertical">
-              {(provided) => (
-                <div
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
-                  className="space-y-6"
-                >
-                  {scenes.map((scene, index) => (
-                    <Draggable
-                      key={index}
-                      draggableId={`scene-${index}`}
-                      index={index}
+            const data = await response.json();
+            if (data.success) {
+                setCombinedVideoUrl(`/generations/${data.sessionId}/final_video.mp4`);
+            }
+        } catch (error) {
+            console.error('Error generating video:', error);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    return (
+        <main className="container mx-auto px-4 py-8">
+            <div className="flex justify-between items-center mb-8">
+                <h1 className="text-3xl font-bold text-gray-900">Storyboard Generator</h1>
+                <div className="space-x-4">
+                    <button
+                        onClick={handleAddScene}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
                     >
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          className={`${snapshot.isDragging ? 'opacity-50' : ''}`}
-                        >
-                          <Scene
-                            id={index}
-                            onSceneChange={handleSceneChange}
-                            thumbnailUrl={dummyData[index].thumbnailUrl}
-                            initialData={scene}
-                          />
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
+                        Add Scene
+                    </button>
+                    <button
+                        onClick={handleGenerateAll}
+                        disabled={isGenerating || scenes.length === 0}
+                        className={`px-4 py-2 rounded-md text-white ${
+                            isGenerating || scenes.length === 0
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-green-500 hover:bg-green-600'
+                        }`}
+                    >
+                        {isGenerating ? 'Generating...' : 'Generate All Videos'}
+                    </button>
                 </div>
-              )}
-            </Droppable>
-          </DragDropContext>
-          <button
-            type="submit"
-            className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Generate Clip
-          </button>
-        </form>
-      </div>
-    </main>
-  );
+            </div>
+
+            {scenes.map((scene, index) => (
+                <Scene
+                    key={index}
+                    scene={scene}
+                    onUpdate={(updatedScene) => handleUpdateScene(index, updatedScene)}
+                    onDelete={() => handleDeleteScene(index)}
+                    onMove={(direction) => handleMoveScene(index, direction)}
+                    isFirst={index === 0}
+                    isLast={index === scenes.length - 1}
+                    index={index}
+                />
+            ))}
+
+            {combinedVideoUrl && (
+                <div className="mt-8">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Combined Video</h2>
+                    <div className="aspect-video w-full max-w-4xl mx-auto bg-black rounded-lg overflow-hidden">
+                        <video
+                            controls
+                            className="w-full h-full"
+                            src={combinedVideoUrl}
+                        >
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                </div>
+            )}
+        </main>
+    );
 }

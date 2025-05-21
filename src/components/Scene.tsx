@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 
 interface SceneProps {
-  id: number;
-  onSceneChange: (id: number, data: SceneData) => void;
-  thumbnailUrl?: string;
-  initialData?: SceneData;
+  scene: SceneData;
+  onUpdate: (updatedScene: SceneData) => void;
+  onDelete: () => void;
+  onMove: (direction: 'up' | 'down') => void;
+  isFirst: boolean;
+  isLast: boolean;
+  index: number;
 }
 
 export interface Dialogue {
@@ -18,141 +21,110 @@ export interface SceneData {
   sceneDirection: string;
   dialogues: Dialogue[];
   audioDirection: string;
+  thumbnailUrl?: string;
 }
 
-const Scene: React.FC<SceneProps> = ({ id, onSceneChange, thumbnailUrl, initialData }) => {
-  const [values, setValues] = React.useState<SceneData>({
-    sceneDirection: initialData?.sceneDirection || '',
-    dialogues: initialData?.dialogues || [],
-    audioDirection: initialData?.audioDirection || ''
-  });
+export default function Scene({ scene, onUpdate, onDelete, onMove, isFirst, isLast, index }: SceneProps) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (initialData) {
-      setValues(initialData);
-    }
-  }, [initialData]);
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/generateClip', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify([scene]),
+      });
 
-  const handleChange = (field: keyof SceneData, value: string | Dialogue[]) => {
-    const newValues = { ...values, [field]: value };
-    setValues(newValues);
-    onSceneChange(id, newValues);
-  };
-
-  const addDialogue = () => {
-    const newDialogue: Dialogue = {
-      character: '',
-      text: '',
-      emotion: ''
-    };
-    handleChange('dialogues', [...values.dialogues, newDialogue]);
-  };
-
-  const removeDialogue = (index: number) => {
-    const newDialogues = values.dialogues.filter((_, i) => i !== index);
-    handleChange('dialogues', newDialogues);
-  };
-
-  const updateDialogue = (index: number, field: keyof Dialogue, value: string) => {
-    const newDialogues = values.dialogues.map((dialogue, i) => {
-      if (i === index) {
-        return { ...dialogue, [field]: value };
+      if (!response.ok) {
+        throw new Error('Failed to generate video');
       }
-      return dialogue;
-    });
-    handleChange('dialogues', newDialogues);
+
+      const data = await response.json();
+      if (data.success) {
+        // Set the video URL for this scene
+        setVideoUrl(`/generations/${data.sessionId}/scene_${index}_with_audio.mp4`);
+      }
+    } catch (error) {
+      console.error('Error generating video:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleDeleteDialogue = (dialogueIndex: number) => {
+    const newDialogues = scene.dialogues.filter((_, i) => i !== dialogueIndex);
+    onUpdate({ ...scene, dialogues: newDialogues });
   };
 
   return (
-    <div className="flex gap-4 p-4 border rounded-lg mb-4 bg-white shadow-sm relative group">
-      <div className="absolute -left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="text-gray-400 cursor-move"
-        >
-          <circle cx="9" cy="12" r="1" />
-          <circle cx="9" cy="5" r="1" />
-          <circle cx="9" cy="19" r="1" />
-          <circle cx="15" cy="12" r="1" />
-          <circle cx="15" cy="5" r="1" />
-          <circle cx="15" cy="19" r="1" />
-        </svg>
-      </div>
-      <div className="w-64 h-64 bg-gray-200 rounded overflow-hidden relative flex-shrink-0">
-        {thumbnailUrl ? (
-          <Image
-            src={thumbnailUrl}
-            alt={`Scene ${id + 1} thumbnail`}
-            fill
-            className="object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-gray-500">Thumbnail</span>
-          </div>
-        )}
-      </div>
-      <div className="flex-1 space-y-4 min-w-[800px]">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Scene Direction
-          </label>
-          <textarea
-            className="w-full p-2 border rounded resize-none"
-            value={values.sceneDirection}
-            onChange={(e) => handleChange('sceneDirection', e.target.value)}
-            rows={6}
-          />
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div className="flex justify-between items-start mb-4">
+        <h3 className="text-xl font-semibold text-gray-800">Scene {index + 1}</h3>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => onMove('up')}
+            disabled={isFirst}
+            className={`p-2 rounded ${isFirst ? 'bg-gray-200' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
+          >
+            ↑
+          </button>
+          <button
+            onClick={() => onMove('down')}
+            disabled={isLast}
+            className={`p-2 rounded ${isLast ? 'bg-gray-200' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
+          >
+            ↓
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-2 rounded bg-red-500 hover:bg-red-600 text-white"
+          >
+            Delete
+          </button>
         </div>
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <label className="block text-sm font-medium text-gray-700">
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-1">
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Scene Direction
+            </label>
+            <textarea
+              value={scene.sceneDirection}
+              onChange={(e) => onUpdate({ ...scene, sceneDirection: e.target.value })}
+              className="w-full p-2 border rounded-md"
+              rows={3}
+              placeholder="Describe the scene..."
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Audio Direction
+            </label>
+            <textarea
+              value={scene.audioDirection}
+              onChange={(e) => onUpdate({ ...scene, audioDirection: e.target.value })}
+              className="w-full p-2 border rounded-md"
+              rows={2}
+              placeholder="Describe the background music..."
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Dialogues
             </label>
-            <button
-              onClick={addDialogue}
-              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Add Dialogue
-            </button>
-          </div>
-          <div className="space-y-3">
-            {values.dialogues.map((dialogue, index) => (
-              <div key={index} className="flex gap-2 items-start">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    placeholder="Character"
-                    className="w-full p-2 border rounded mb-2"
-                    value={dialogue.character}
-                    onChange={(e) => updateDialogue(index, 'character', e.target.value)}
-                  />
-                  <textarea
-                    placeholder="Dialogue text"
-                    className="w-full p-2 border rounded resize-none"
-                    value={dialogue.text}
-                    onChange={(e) => updateDialogue(index, 'text', e.target.value)}
-                    rows={2}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Emotion"
-                    className="w-full p-2 border rounded mt-2"
-                    value={dialogue.emotion}
-                    onChange={(e) => updateDialogue(index, 'emotion', e.target.value)}
-                  />
-                </div>
+            {scene.dialogues.map((dialogue, dialogueIndex) => (
+              <div key={dialogueIndex} className="mb-2 p-2 border rounded-md relative">
                 <button
-                  onClick={() => removeDialogue(index)}
-                  className="p-2 text-red-500 hover:text-red-700"
+                  onClick={() => handleDeleteDialogue(dialogueIndex)}
+                  className="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -169,24 +141,101 @@ const Scene: React.FC<SceneProps> = ({ id, onSceneChange, thumbnailUrl, initialD
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                   </svg>
                 </button>
+                <input
+                  type="text"
+                  value={dialogue.character}
+                  onChange={(e) => {
+                    const newDialogues = [...scene.dialogues];
+                    newDialogues[dialogueIndex] = { ...dialogue, character: e.target.value };
+                    onUpdate({ ...scene, dialogues: newDialogues });
+                  }}
+                  className="w-full p-2 border rounded-md mb-2"
+                  placeholder="Character name"
+                />
+                <textarea
+                  value={dialogue.text}
+                  onChange={(e) => {
+                    const newDialogues = [...scene.dialogues];
+                    newDialogues[dialogueIndex] = { ...dialogue, text: e.target.value };
+                    onUpdate({ ...scene, dialogues: newDialogues });
+                  }}
+                  className="w-full p-2 border rounded-md"
+                  rows={2}
+                  placeholder="Dialogue text..."
+                />
+                <select
+                  value={dialogue.emotion}
+                  onChange={(e) => {
+                    const newDialogues = [...scene.dialogues];
+                    newDialogues[dialogueIndex] = { ...dialogue, emotion: e.target.value };
+                    onUpdate({ ...scene, dialogues: newDialogues });
+                  }}
+                  className="w-full p-2 border rounded-md mt-2"
+                >
+                  <option value="">Select emotion</option>
+                  <option value="happy">Happy</option>
+                  <option value="sad">Sad</option>
+                  <option value="angry">Angry</option>
+                  <option value="neutral">Neutral</option>
+                </select>
               </div>
             ))}
+            <button
+              onClick={() => {
+                const newDialogues = [...scene.dialogues, { character: '', text: '', emotion: '' }];
+                onUpdate({ ...scene, dialogues: newDialogues });
+              }}
+              className="mt-2 p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+            >
+              Add Dialogue
+            </button>
+          </div>
+
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className={`w-full p-3 rounded-md text-white font-medium ${
+              isGenerating 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-blue-500 hover:bg-blue-600'
+            }`}
+          >
+            {isGenerating ? 'Generating...' : 'Generate Video'}
+          </button>
+        </div>
+
+        <div className="md:col-span-1">
+          <div className="aspect-video w-full bg-gray-100 rounded-lg overflow-hidden mb-4">
+            {scene.thumbnailUrl ? (
+              <Image
+                src={scene.thumbnailUrl}
+                alt={`Scene ${index + 1} storyboard`}
+                width={400}
+                height={300}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                <span>Storyboard Image</span>
+              </div>
+            )}
           </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Audio Direction
-          </label>
-          <textarea
-            className="w-full p-2 border rounded resize-none"
-            value={values.audioDirection}
-            onChange={(e) => handleChange('audioDirection', e.target.value)}
-            rows={2}
-          />
+
+        <div className="md:col-span-1">
+          {videoUrl && (
+            <div className="aspect-video w-full bg-black rounded-lg overflow-hidden">
+              <video 
+                controls 
+                className="w-full h-full"
+                src={videoUrl}
+              >
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
-};
-
-export default Scene; 
+} 
