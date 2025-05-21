@@ -56,7 +56,7 @@ const Scene: React.FC<SceneProps> = ({ id, onSceneChange, thumbnailUrl, initialD
           <circle cx="15" cy="19" r="1" />
         </svg>
       </div>
-      <div className="w-48 h-48 bg-gray-200 rounded overflow-hidden relative">
+      <div className="w-64 h-64 bg-gray-200 rounded overflow-hidden relative flex-shrink-0">
         {thumbnailUrl ? (
           <Image
             src={thumbnailUrl}
@@ -70,38 +70,38 @@ const Scene: React.FC<SceneProps> = ({ id, onSceneChange, thumbnailUrl, initialD
           </div>
         )}
       </div>
-      <div className="flex-1 space-y-4">
+      <div className="flex-1 space-y-4 min-w-[800px]">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Scene Direction
           </label>
-          <input
-            type="text"
-            className="w-full p-2 border rounded"
+          <textarea
+            className="w-full p-2 border rounded resize-none"
             value={values.sceneDirection}
             onChange={(e) => handleChange('sceneDirection', e.target.value)}
+            rows={6}
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Dialogues
           </label>
-          <input
-            type="text"
-            className="w-full p-2 border rounded"
+          <textarea
+            className="w-full p-2 border rounded resize-none"
             value={values.dialogues}
             onChange={(e) => handleChange('dialogues', e.target.value)}
+            rows={2}
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Audio Direction
           </label>
-          <input
-            type="text"
-            className="w-full p-2 border rounded"
+          <textarea
+            className="w-full p-2 border rounded resize-none"
             value={values.audioDirection}
             onChange={(e) => handleChange('audioDirection', e.target.value)}
+            rows={2}
           />
         </div>
       </div>

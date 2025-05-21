@@ -32,6 +32,14 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+.mp4
+.mp3
+.wav
+.mov
+.m4a
+.m4v
+.m4b
+.m4p
 
 # vercel
 .vercel
