@@ -8,16 +8,22 @@ interface SceneProps {
   initialData?: SceneData;
 }
 
+export interface Dialogue {
+  character: string;
+  text: string;
+  emotion: string;
+}
+
 export interface SceneData {
   sceneDirection: string;
-  dialogues: string;
+  dialogues: Dialogue[];
   audioDirection: string;
 }
 
 const Scene: React.FC<SceneProps> = ({ id, onSceneChange, thumbnailUrl, initialData }) => {
   const [values, setValues] = React.useState<SceneData>({
     sceneDirection: initialData?.sceneDirection || '',
-    dialogues: initialData?.dialogues || '',
+    dialogues: initialData?.dialogues || [],
     audioDirection: initialData?.audioDirection || ''
   });
 
@@ -27,10 +33,34 @@ const Scene: React.FC<SceneProps> = ({ id, onSceneChange, thumbnailUrl, initialD
     }
   }, [initialData]);
 
-  const handleChange = (field: keyof SceneData, value: string) => {
+  const handleChange = (field: keyof SceneData, value: string | Dialogue[]) => {
     const newValues = { ...values, [field]: value };
     setValues(newValues);
     onSceneChange(id, newValues);
+  };
+
+  const addDialogue = () => {
+    const newDialogue: Dialogue = {
+      character: '',
+      text: '',
+      emotion: ''
+    };
+    handleChange('dialogues', [...values.dialogues, newDialogue]);
+  };
+
+  const removeDialogue = (index: number) => {
+    const newDialogues = values.dialogues.filter((_, i) => i !== index);
+    handleChange('dialogues', newDialogues);
+  };
+
+  const updateDialogue = (index: number, field: keyof Dialogue, value: string) => {
+    const newDialogues = values.dialogues.map((dialogue, i) => {
+      if (i === index) {
+        return { ...dialogue, [field]: value };
+      }
+      return dialogue;
+    });
+    handleChange('dialogues', newDialogues);
   };
 
   return (
@@ -83,15 +113,65 @@ const Scene: React.FC<SceneProps> = ({ id, onSceneChange, thumbnailUrl, initialD
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Dialogues
-          </label>
-          <textarea
-            className="w-full p-2 border rounded resize-none"
-            value={values.dialogues}
-            onChange={(e) => handleChange('dialogues', e.target.value)}
-            rows={2}
-          />
+          <div className="flex justify-between items-center mb-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Dialogues
+            </label>
+            <button
+              onClick={addDialogue}
+              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Add Dialogue
+            </button>
+          </div>
+          <div className="space-y-3">
+            {values.dialogues.map((dialogue, index) => (
+              <div key={index} className="flex gap-2 items-start">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder="Character"
+                    className="w-full p-2 border rounded mb-2"
+                    value={dialogue.character}
+                    onChange={(e) => updateDialogue(index, 'character', e.target.value)}
+                  />
+                  <textarea
+                    placeholder="Dialogue text"
+                    className="w-full p-2 border rounded resize-none"
+                    value={dialogue.text}
+                    onChange={(e) => updateDialogue(index, 'text', e.target.value)}
+                    rows={2}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Emotion"
+                    className="w-full p-2 border rounded mt-2"
+                    value={dialogue.emotion}
+                    onChange={(e) => updateDialogue(index, 'emotion', e.target.value)}
+                  />
+                </div>
+                <button
+                  onClick={() => removeDialogue(index)}
+                  className="p-2 text-red-500 hover:text-red-700"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
