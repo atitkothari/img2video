@@ -15,9 +15,22 @@ export interface SceneData {
 }
 
 const Scene: React.FC<SceneProps> = ({ id, onSceneChange, thumbnailUrl, initialData }) => {
+  const [values, setValues] = React.useState<SceneData>({
+    sceneDirection: initialData?.sceneDirection || '',
+    dialogues: initialData?.dialogues || '',
+    audioDirection: initialData?.audioDirection || ''
+  });
+
+  React.useEffect(() => {
+    if (initialData) {
+      setValues(initialData);
+    }
+  }, [initialData]);
+
   const handleChange = (field: keyof SceneData, value: string) => {
-    const updatedData: Partial<SceneData> = { [field]: value };
-    onSceneChange(id, updatedData as SceneData);
+    const newValues = { ...values, [field]: value };
+    setValues(newValues);
+    onSceneChange(id, newValues);
   };
 
   return (
@@ -65,8 +78,8 @@ const Scene: React.FC<SceneProps> = ({ id, onSceneChange, thumbnailUrl, initialD
           <input
             type="text"
             className="w-full p-2 border rounded"
+            value={values.sceneDirection}
             onChange={(e) => handleChange('sceneDirection', e.target.value)}
-            defaultValue={initialData?.sceneDirection}
           />
         </div>
         <div>
@@ -76,8 +89,8 @@ const Scene: React.FC<SceneProps> = ({ id, onSceneChange, thumbnailUrl, initialD
           <input
             type="text"
             className="w-full p-2 border rounded"
+            value={values.dialogues}
             onChange={(e) => handleChange('dialogues', e.target.value)}
-            defaultValue={initialData?.dialogues}
           />
         </div>
         <div>
@@ -87,8 +100,8 @@ const Scene: React.FC<SceneProps> = ({ id, onSceneChange, thumbnailUrl, initialD
           <input
             type="text"
             className="w-full p-2 border rounded"
+            value={values.audioDirection}
             onChange={(e) => handleChange('audioDirection', e.target.value)}
-            defaultValue={initialData?.audioDirection}
           />
         </div>
       </div>
