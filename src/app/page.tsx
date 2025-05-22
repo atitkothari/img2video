@@ -5,17 +5,75 @@ import Scene from '@/components/Scene';
 import type { SceneData } from '@/components/Scene';
 import { dummyScenes } from '@/data/dummyScenes';
 
+interface Session {
+    id: string;
+    date: string;
+    sceneCount: number;
+    hasFinalVideo: boolean;
+}
+
 export default function Home() {
     const [scenes, setScenes] = useState<SceneData[]>(dummyScenes);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isCombining, setIsCombining] = useState(false);
     const [combinedVideoUrl, setCombinedVideoUrl] = useState<string | null>(null);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+    const [sessions, setSessions] = useState<Session[]>([]);
+    const [isLoadingSessions, setIsLoadingSessions] = useState(false);
 
     useEffect(() => {
         // Create a new session ID on page load
         setCurrentSessionId(`session_${Date.now()}`);
+        loadSessions();
     }, []);
+
+    const loadSessions = async () => {
+        setIsLoadingSessions(true);
+        try {
+            const response = await fetch('/api/listSessions');
+            if (!response.ok) throw new Error('Failed to load sessions');
+            const data = await response.json();
+            if (data.success) {
+                setSessions(data.sessions);
+            }
+        } catch (error) {
+            console.error('Error loading sessions:', error);
+        } finally {
+            setIsLoadingSessions(false);
+        }
+    };
+
+    const handleLoadSession = async (sessionId: string) => {
+        setCurrentSessionId(sessionId);
+        
+        // Load session details
+        try {
+            const response = await fetch('/api/listSessions');
+            if (!response.ok) throw new Error('Failed to load session details');
+            const data = await response.json();
+            if (data.success) {
+                const session = data.sessions.find((s: Session) => s.id === sessionId);
+                if (session) {
+                    // Load combined video if it exists
+                    if (session.hasFinalVideo) {
+                        setCombinedVideoUrl(`/generations/${sessionId}/final_video.mp4`);
+                    }
+                    
+                    // Update scenes with video URLs
+                    const updatedScenes = scenes.map((scene, index) => {
+                        const videoPath = `/generations/${sessionId}/scene_${index}_with_audio.mp4`;
+                        return {
+                            ...scene,
+                            videoUrl: videoPath
+                        };
+                    });
+                    setScenes(updatedScenes);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading session details:', error);
+        }
+    };
 
     const handleAddScene = () => {
         setScenes([...scenes, {
@@ -163,6 +221,54 @@ export default function Home() {
                     >
                         {isCombining ? 'Combining...' : 'Combine Videos'}
                     </button>
+                </div>
+            </div>
+
+            {/* Session List */}
+            <div className="mb-8">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-semibold text-gray-900">Previous Sessions</h2>
+                    <button
+                        onClick={loadSessions}
+                        disabled={isLoadingSessions}
+                        className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                    >
+                        {isLoadingSessions ? 'Loading...' : 'Refresh'}
+                    </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {sessions.map((session) => (
+                        <div
+                            key={session.id}
+                            className={`p-4 rounded-lg border ${
+                                session.id === currentSessionId
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 hover:border-blue-300'
+                            }`}
+                        >
+                            <div className="flex justify-between items-start mb-2">
+                                <div>
+                                    <p className="text-sm text-gray-500">{session.date}</p>
+                                    <p className="font-medium">{session.sceneCount} scenes</p>
+                                </div>
+                                {session.hasFinalVideo && (
+                                    <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">
+                                        Has final video
+                                    </span>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => handleLoadSession(session.id)}
+                                className={`w-full mt-2 px-3 py-1 text-sm rounded ${
+                                    session.id === currentSessionId
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                            >
+                                {session.id === currentSessionId ? 'Current Session' : 'Load Session'}
+                            </button>
+                        </div>
+                    ))}
                 </div>
             </div>
 

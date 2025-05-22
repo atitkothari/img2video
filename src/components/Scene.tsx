@@ -24,6 +24,7 @@ export interface SceneData {
   dialogues: Dialogue[];
   audioDirection: string;
   thumbnailUrl?: string;
+  videoUrl?: string;
 }
 
 export default function Scene({ 
@@ -38,16 +39,16 @@ export default function Scene({
   onGenerate
 }: SceneProps) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
 
   const handleGenerate = async () => {
+    if (!onGenerate) return;
+    
     setIsGenerating(true);
     try {
       const sessionId = await onGenerate(index);
       if (sessionId) {
-        // Use the current session ID if available, otherwise use the new one
-        const finalSessionId = currentSessionId || sessionId;
-        setVideoUrl(`/generations/${finalSessionId}/scene_${index}_with_audio.mp4`);
+        setGeneratedVideoUrl(`/generations/${sessionId}/scene_${index}_with_audio.mp4`);
       }
     } catch (error) {
       console.error('Error generating video:', error);
@@ -60,6 +61,9 @@ export default function Scene({
     const newDialogues = scene.dialogues.filter((_, i) => i !== dialogueIndex);
     onUpdate({ ...scene, dialogues: newDialogues });
   };
+
+  // Use either the loaded video URL or the generated one
+  const videoUrl = scene.videoUrl || generatedVideoUrl;
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -192,49 +196,54 @@ export default function Scene({
             </button>
           </div>
 
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className={`w-full p-3 rounded-md text-white font-medium ${
-              isGenerating 
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-blue-500 hover:bg-blue-600'
-            }`}
-          >
-            {isGenerating ? 'Generating...' : 'Generate Video'}
-          </button>
-        </div>
-
-        <div className="md:col-span-1">
-          <div className="aspect-video w-full bg-gray-100 rounded-lg overflow-hidden mb-4">
-            {scene.thumbnailUrl ? (
-              <Image
-                src={scene.thumbnailUrl}
-                alt={`Scene ${index + 1} storyboard`}
-                width={400}
-                height={300}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                <span>Storyboard Image</span>
-              </div>
-            )}
+          {/* Generate Button */}
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating || !currentSessionId}
+              className={`px-4 py-2 rounded-md text-white ${
+                isGenerating || !currentSessionId
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-green-500 hover:bg-green-600'
+              }`}
+            >
+              {isGenerating ? 'Generating...' : 'Generate Video'}
+            </button>
           </div>
         </div>
 
-        <div className="md:col-span-1">
-          {videoUrl && (
-            <div className="aspect-video w-full bg-black rounded-lg overflow-hidden">
-              <video 
-                controls 
-                className="w-full h-full"
-                src={videoUrl}
-              >
-                Your browser does not support the video tag.
-              </video>
+        <div className="md:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Thumbnail */}
+            <div className="aspect-video w-full bg-gray-100 rounded-lg overflow-hidden">
+              {scene.thumbnailUrl ? (
+                <Image
+                  src={scene.thumbnailUrl}
+                  alt={`Scene ${index + 1} storyboard`}
+                  width={400}
+                  height={300}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                  <span>Storyboard Image</span>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Video Preview */}
+            {videoUrl && (
+              <div className="aspect-video w-full bg-black rounded-lg overflow-hidden">
+                <video
+                  controls
+                  className="w-full h-full"
+                  src={videoUrl}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
