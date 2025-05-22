@@ -9,6 +9,8 @@ interface SceneProps {
   isFirst: boolean;
   isLast: boolean;
   index: number;
+  currentSessionId: string | null;
+  onGenerate: (sceneIndex: number) => Promise<string | null>;
 }
 
 export interface Dialogue {
@@ -24,29 +26,28 @@ export interface SceneData {
   thumbnailUrl?: string;
 }
 
-export default function Scene({ scene, onUpdate, onDelete, onMove, isFirst, isLast, index }: SceneProps) {
+export default function Scene({ 
+  scene, 
+  onUpdate, 
+  onDelete, 
+  onMove, 
+  isFirst, 
+  isLast, 
+  index,
+  currentSessionId,
+  onGenerate
+}: SceneProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
-      const response = await fetch('/api/generateClip', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify([scene]),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate video');
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        // Set the video URL for this scene
-        setVideoUrl(`/generations/${data.sessionId}/scene_${index}_with_audio.mp4`);
+      const sessionId = await onGenerate(index);
+      if (sessionId) {
+        // Use the current session ID if available, otherwise use the new one
+        const finalSessionId = currentSessionId || sessionId;
+        setVideoUrl(`/generations/${finalSessionId}/scene_${index}_with_audio.mp4`);
       }
     } catch (error) {
       console.error('Error generating video:', error);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Scene from '@/components/Scene';
 import type { SceneData } from '@/components/Scene';
 import { dummyScenes } from '@/data/dummyScenes';
@@ -8,7 +8,14 @@ import { dummyScenes } from '@/data/dummyScenes';
 export default function Home() {
     const [scenes, setScenes] = useState<SceneData[]>(dummyScenes);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isCombining, setIsCombining] = useState(false);
     const [combinedVideoUrl, setCombinedVideoUrl] = useState<string | null>(null);
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+    useEffect(() => {
+        // Create a new session ID on page load
+        setCurrentSessionId(`session_${Date.now()}`);
+    }, []);
 
     const handleAddScene = () => {
         setScenes([...scenes, {
@@ -44,7 +51,10 @@ export default function Home() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(scenes),
+                body: JSON.stringify({
+                    scenes,
+                    sessionId: currentSessionId
+                }),
             });
 
             if (!response.ok) {
@@ -53,12 +63,70 @@ export default function Home() {
 
             const data = await response.json();
             if (data.success) {
-                setCombinedVideoUrl(`/generations/${data.sessionId}/final_video.mp4`);
+                setCombinedVideoUrl(`/generations/${currentSessionId}/final_video.mp4`);
             }
         } catch (error) {
             console.error('Error generating video:', error);
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const handleGenerateSingle = async (sceneIndex: number) => {
+        try {
+            const response = await fetch('/api/generateClip', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    scenes,
+                    sessionId: currentSessionId,
+                    sceneIndex
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate video');
+            }
+
+            const data = await response.json();
+            if (data.success) {
+                return currentSessionId;
+            }
+        } catch (error) {
+            console.error('Error generating video:', error);
+        }
+        return null;
+    };
+
+    const handleCombineVideos = async () => {
+        if (!currentSessionId) return;
+        
+        setIsCombining(true);
+        try {
+            const response = await fetch('/api/combineVideos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    sessionId: currentSessionId
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to combine videos');
+            }
+
+            const data = await response.json();
+            if (data.success) {
+                setCombinedVideoUrl(data.videoPath);
+            }
+        } catch (error) {
+            console.error('Error combining videos:', error);
+        } finally {
+            setIsCombining(false);
         }
     };
 
@@ -84,6 +152,17 @@ export default function Home() {
                     >
                         {isGenerating ? 'Generating...' : 'Generate All Videos'}
                     </button>
+                    <button
+                        onClick={handleCombineVideos}
+                        disabled={isCombining || !currentSessionId}
+                        className={`px-4 py-2 rounded-md text-white ${
+                            isCombining || !currentSessionId
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-purple-500 hover:bg-purple-600'
+                        }`}
+                    >
+                        {isCombining ? 'Combining...' : 'Combine Videos'}
+                    </button>
                 </div>
             </div>
 
@@ -97,6 +176,8 @@ export default function Home() {
                     isFirst={index === 0}
                     isLast={index === scenes.length - 1}
                     index={index}
+                    currentSessionId={currentSessionId}
+                    onGenerate={handleGenerateSingle}
                 />
             ))}
 
