@@ -16,8 +16,15 @@ interface SceneProps {
 export interface Dialogue {
   character: string;
   text: string;
-  emotion: string;
 }
+
+// Add character options
+const CHARACTER_OPTIONS = [
+  { value: 'sarah', label: 'Sarah' },
+  { value: 'mike', label: 'Mike' },
+  { value: 'emma', label: 'Emma' },
+  { value: 'alex', label: 'Alex' }
+];
 
 export interface SceneData {
   sceneDirection: string;
@@ -25,6 +32,7 @@ export interface SceneData {
   audioDirection: string;
   thumbnailUrl?: string;
   videoUrl?: string;
+  isLastFrame?: boolean;
 }
 
 export default function Scene({ 
@@ -40,6 +48,7 @@ export default function Scene({
 }: SceneProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleGenerate = async () => {
     if (!onGenerate) return;
@@ -62,13 +71,55 @@ export default function Scene({
     onUpdate({ ...scene, dialogues: newDialogues });
   };
 
+  const handleThumbnailUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentSessionId) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('sessionId', currentSessionId);
+      formData.append('sceneIndex', index.toString());
+
+      const response = await fetch('/api/uploadThumbnail', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload thumbnail');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        onUpdate({ ...scene, thumbnailUrl: data.thumbnailUrl });
+      }
+    } catch (error) {
+      console.error('Error uploading thumbnail:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // Use either the loaded video URL or the generated one
   const videoUrl = scene.videoUrl || generatedVideoUrl;
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-6">
       <div className="flex justify-between items-start mb-4">
-        <h3 className="text-xl font-semibold text-gray-800">Scene {index + 1}</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-semibold text-gray-800">Scene {index + 1}</h3>
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={scene.isLastFrame || false}
+              onChange={(e) => onUpdate({ ...scene, isLastFrame: e.target.checked })}
+              className="rounded border-gray-300"
+            />
+            Use as Last Frame
+          </label>
+        </div>
         <div className="flex space-x-2">
           <button
             onClick={() => onMove('up')}
@@ -146,8 +197,7 @@ export default function Scene({
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                   </svg>
                 </button>
-                <input
-                  type="text"
+                <select
                   value={dialogue.character}
                   onChange={(e) => {
                     const newDialogues = [...scene.dialogues];
@@ -155,8 +205,14 @@ export default function Scene({
                     onUpdate({ ...scene, dialogues: newDialogues });
                   }}
                   className="w-full p-2 border rounded-md mb-2"
-                  placeholder="Character name"
-                />
+                >
+                  <option value="">Select character</option>
+                  {CHARACTER_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
                 <textarea
                   value={dialogue.text}
                   onChange={(e) => {
@@ -168,26 +224,11 @@ export default function Scene({
                   rows={2}
                   placeholder="Dialogue text..."
                 />
-                <select
-                  value={dialogue.emotion}
-                  onChange={(e) => {
-                    const newDialogues = [...scene.dialogues];
-                    newDialogues[dialogueIndex] = { ...dialogue, emotion: e.target.value };
-                    onUpdate({ ...scene, dialogues: newDialogues });
-                  }}
-                  className="w-full p-2 border rounded-md mt-2"
-                >
-                  <option value="">Select emotion</option>
-                  <option value="happy">Happy</option>
-                  <option value="sad">Sad</option>
-                  <option value="angry">Angry</option>
-                  <option value="neutral">Neutral</option>
-                </select>
               </div>
             ))}
             <button
               onClick={() => {
-                const newDialogues = [...scene.dialogues, { character: '', text: '', emotion: '' }];
+                const newDialogues = [...scene.dialogues, { character: '', text: '' }];
                 onUpdate({ ...scene, dialogues: newDialogues });
               }}
               className="mt-2 p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
@@ -215,7 +256,7 @@ export default function Scene({
         <div className="md:col-span-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Thumbnail */}
-            <div className="aspect-video w-full bg-gray-100 rounded-lg overflow-hidden">
+            <div className="aspect-video w-full bg-gray-100 rounded-lg overflow-hidden relative group">
               {scene.thumbnailUrl ? (
                 <Image
                   src={scene.thumbnailUrl}
@@ -229,6 +270,18 @@ export default function Scene({
                   <span>Storyboard Image</span>
                 </div>
               )}
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <label className="cursor-pointer bg-white text-gray-800 px-4 py-2 rounded-md hover:bg-gray-100 transition-colors">
+                  {isUploading ? 'Uploading...' : 'Upload Thumbnail'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleThumbnailUpload}
+                    className="hidden"
+                    disabled={isUploading}
+                  />
+                </label>
+              </div>
             </div>
 
             {/* Video Preview */}
