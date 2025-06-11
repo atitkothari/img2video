@@ -102,6 +102,31 @@ export default function Scene({
     }
   };
 
+  const handleDownloadScene = () => {
+    // Create a scene object in the same format as dummyScenes
+    const sceneData = {
+      thumbnailUrl: scene.thumbnailUrl || '',
+      sceneDirection: scene.sceneDirection,
+      dialogues: scene.dialogues,
+      audioDirection: scene.audioDirection,
+      isLastFrame: scene.isLastFrame
+    };
+
+    // Convert to JSON and create a blob
+    const jsonString = JSON.stringify(sceneData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    // Create a temporary link and trigger download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `scene_${index + 1}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   // Use either the loaded video URL or the generated one
   const videoUrl = scene.videoUrl || generatedVideoUrl;
 
@@ -121,6 +146,17 @@ export default function Scene({
           </label>
         </div>
         <div className="flex space-x-2">
+          <button
+            onClick={handleDownloadScene}
+            className="p-2 rounded bg-gray-500 hover:bg-gray-600 text-white"
+            title="Download Scene Data"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
           <button
             onClick={() => onMove('up')}
             disabled={isFirst}
