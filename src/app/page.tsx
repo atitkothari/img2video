@@ -17,6 +17,8 @@ export default function Home() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [isCombining, setIsCombining] = useState(false);
     const [combinedVideoUrl, setCombinedVideoUrl] = useState<string | null>(null);
+    const [s3VideoUrl, setS3VideoUrl] = useState<string | null>(null);
+    const [sceneS3Urls, setSceneS3Urls] = useState<Record<number, string>>({});
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [sessions, setSessions] = useState<Session[]>([]);
     const [isLoadingSessions, setIsLoadingSessions] = useState(false);
@@ -122,6 +124,18 @@ export default function Home() {
             const data = await response.json();
             if (data.success) {
                 setCombinedVideoUrl(`/generations/${currentSessionId}/final_video.mp4`);
+                if (data.s3Url) {
+                    setS3VideoUrl(data.s3Url);
+                }
+                if (data.sceneS3Urls) {
+                    const newSceneS3Urls: Record<number, string> = {};
+                    data.sceneS3Urls.forEach((url: string, index: number) => {
+                        if (url) {
+                            newSceneS3Urls[index] = url;
+                        }
+                    });
+                    setSceneS3Urls(newSceneS3Urls);
+                }
             }
         } catch (error) {
             console.error('Error generating video:', error);
@@ -150,6 +164,12 @@ export default function Home() {
 
             const data = await response.json();
             if (data.success) {
+                if (data.sceneS3Urls && data.sceneS3Urls[0]) {
+                    setSceneS3Urls(prev => ({
+                        ...prev,
+                        [sceneIndex]: data.sceneS3Urls[0]
+                    }));
+                }
                 return currentSessionId;
             }
         } catch (error) {
@@ -320,6 +340,7 @@ export default function Home() {
                     index={index}
                     currentSessionId={currentSessionId}
                     onGenerate={handleGenerateSingle}
+                    s3VideoUrl={sceneS3Urls[index]}
                 />
             ))}
 
@@ -335,6 +356,27 @@ export default function Home() {
                             Your browser does not support the video tag.
                         </video>
                     </div>
+                    {s3VideoUrl && (
+                        <div className="mt-4">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">S3 Video URL</h3>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={s3VideoUrl}
+                                    readOnly
+                                    className="flex-1 p-2 border rounded-md bg-gray-50"
+                                />
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(s3VideoUrl);
+                                    }}
+                                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                                >
+                                    Copy URL
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </main>

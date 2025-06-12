@@ -11,6 +11,7 @@ interface SceneProps {
   index: number;
   currentSessionId: string | null;
   onGenerate: (sceneIndex: number) => Promise<string | null>;
+  s3VideoUrl?: string;
 }
 
 export interface Dialogue {
@@ -44,7 +45,8 @@ export default function Scene({
   isLast, 
   index,
   currentSessionId,
-  onGenerate
+  onGenerate,
+  s3VideoUrl
 }: SceneProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
@@ -127,8 +129,8 @@ export default function Scene({
     URL.revokeObjectURL(url);
   };
 
-  // Use either the loaded video URL or the generated one
-  const videoUrl = scene.videoUrl || generatedVideoUrl;
+  // Use either the S3 URL, loaded video URL, or the generated one
+  const videoUrl = s3VideoUrl || scene.videoUrl || generatedVideoUrl;
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-6">
